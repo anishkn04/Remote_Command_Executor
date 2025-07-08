@@ -2,9 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include <arpa/inet.h>
 
 const int PORT = 8080;
+const int INITIAL_BUFFER_SIZE = 8192;    // Start with 8KB
+const int MAX_BUFFER_SIZE = 1024 * 1024; // Max 1MB
 
 void exitter(const char *err);
 
@@ -44,56 +48,91 @@ int main()
         exitter("Failed to send command");
     }
 
-    char output_buffer[1024];
-    ssize_t n;
-    char exit_status_buffer[4];
-    int exit_status_index = 0;
-    int got_exit_status = 0;
-
-    printf("Command output:\n");
-
-    while ((n = recv(sock, output_buffer, sizeof(output_buffer), 0)) > 0)
+    // Dynamic buffer allocation
+    int buffer_size = INITIAL_BUFFER_SIZE;
+    char *full_output = malloc(buffer_size);
+    if (!full_output)
     {
-        if (got_exit_status)
-            break;
-        if (n >= 4)
-        {
-            fwrite(output_buffer, 1, n - 4, stdout);
-            memcpy(exit_status_buffer, output_buffer + n - 4, 4);
-            got_exit_status = 1;
-            break;
-        }
-        else
-        {
-            fwrite(output_buffer, 1, n, stdout);
-        }
+        exitter("Failed to allocate memory");
     }
 
-    if (!got_exit_status)
+    char recv_buffer[4096];
+    ssize_t n;
+    int total_len = 0;
+
+    printf("Receiving output...\n");
+
+    // Read all output until server closes connection
+    while ((n = recv(sock, recv_buffer, sizeof(recv_buffer), 0)) > 0)
     {
-        while (exit_status_index < 4)
+        printf("[client] Received %zd bytes from server\n", n);
+
+        // Check if we need to resize buffer
+        if (total_len + n > buffer_size)
         {
-            ssize_t r = recv(sock, exit_status_buffer + exit_status_index, 4 - exit_status_index, 0);
-            if (r <= 0)
+            // Double the buffer size
+            int new_size = buffer_size * 2;
+            if (new_size > MAX_BUFFER_SIZE)
             {
-                fprintf(stderr, "Failed to receive exit status\n");
+                fprintf(stderr, "Output too large (exceeds %d bytes)\n", MAX_BUFFER_SIZE);
+                free(full_output);
                 close(sock);
                 return 1;
             }
-            exit_status_index += r;
+
+            char *new_buffer = realloc(full_output, new_size);
+            if (!new_buffer)
+            {
+                fprintf(stderr, "Failed to reallocate memory\n");
+                free(full_output);
+                close(sock);
+                return 1;
+            }
+
+            full_output = new_buffer;
+            buffer_size = new_size;
+            printf("[client] Expanded buffer to %d bytes\n", buffer_size);
         }
+
+        memcpy(full_output + total_len, recv_buffer, n);
+        total_len += n;
     }
 
-    int exit_status_network;
-    memcpy(&exit_status_network, exit_status_buffer, 4);
-    int exit_status = ntohl(exit_status_network);
-    printf("\nExit status: %d\n", exit_status);
+    printf("[client] Total received: %d bytes\n", total_len);
 
+    if (total_len < 4)
+    {
+        fprintf(stderr, "Did not receive enough data for exit status\n");
+        free(full_output);
+        close(sock);
+        return 1;
+    }
+
+    // Extract exit status (last 4 bytes)
+    int exit_status_network;
+    memcpy(&exit_status_network, full_output + total_len - 4, 4);
+    int exit_status = ntohl(exit_status_network);
+
+    printf("\n=== COMMAND OUTPUT ===\n");
+    if (total_len > 4)
+    {
+        // Write output excluding the last 4 bytes (exit status)
+        fwrite(full_output, 1, total_len - 4, stdout);
+        fflush(stdout);
+    }
+    else
+    {
+        printf("[client] No output received from server.\n");
+    }
+    printf("\n=== END OUTPUT ===\n");
+    printf("Exit status: %d\n", exit_status);
+
+    free(full_output);
     close(sock);
     return 0;
 }
 
-inline void exitter(const char *err)
+void exitter(const char *err)
 {
     perror(err);
     exit(EXIT_FAILURE);
