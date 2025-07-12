@@ -43,6 +43,7 @@ This will create `compiled_server` and `compiled_client` executables.
 ## Project Group:
 * Anish Kumar Neupane, 221608
 * Rushab Risal, 221637
+* Prayojan Puri, 221632
 
 ## Date: July 8, 2025
 
