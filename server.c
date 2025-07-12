@@ -200,6 +200,7 @@ void *handle_client(void *arg)
     close(pipefd[0]);
     close(pipefd[1]);
     waitpid(child_pid, NULL, 0);
+    printf("[Client %d] Output sent\n", client_id);
 
 cleanup:
     close(client_socket);

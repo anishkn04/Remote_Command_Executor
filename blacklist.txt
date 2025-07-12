@@ -1,5 +1,6 @@
 # Blacklisted commands - one per line
 # Commands containing these patterns will be blocked
+# Commented lines will be ignored
 rm -rf
 reboot
 shutdown
