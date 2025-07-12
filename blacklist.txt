@@ -1,0 +1,25 @@
+# Blacklisted commands - one per line
+# Commands containing these patterns will be blocked
+rm -rf
+reboot
+shutdown
+halt
+poweroff
+mkfs
+fdisk
+dd if=
+format
+rm -r /
+rm -rf /
+chmod 777 /
+chown root
+sudo rm
+su -
+passwd
+userdel
+usermod
+deluser
+init 0
+init 6
+wall
+sudo
