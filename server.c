@@ -33,16 +33,17 @@ typedef struct
 int main()
 {
     signal(SIGPIPE, SIG_IGN);
-    
+
     int server_fd;
     struct sockaddr_in address;
-    
+
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(PORT);
 
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_fd == -1) exitter("Socket failed");
+    if (server_fd == -1)
+        exitter("Socket failed");
 
     int opt = 1;
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
@@ -53,7 +54,8 @@ int main()
 
     printf("Server running on port: %d\n", PORT);
 
-    if (listen(server_fd, MAX_CLIENTS) < 0) exitter("Listen failed");
+    if (listen(server_fd, MAX_CLIENTS) < 0)
+        exitter("Listen failed");
 
     load_blacklist("blacklist.txt");
     printf("Loaded %d blacklisted commands\n", blacklist_count);
@@ -125,10 +127,10 @@ void *handle_client(void *arg)
         printf("[Client %d] Command is blacklisted: '%s'\n", client_id, buffer);
         const char *error_message = "Error: Command is not allowed\n";
         send(client_socket, error_message, strlen(error_message), 0);
-        
+
         int exit_status_network = htonl(1);
         send(client_socket, &exit_status_network, sizeof(exit_status_network), 0);
-        
+
         shutdown(client_socket, SHUT_WR);
         goto cleanup;
     }
@@ -162,7 +164,7 @@ void *handle_client(void *arg)
         {
             close(client_socket);
             close(pipefd[0]);
-            
+
             dup2(pipefd[1], STDOUT_FILENO);
             dup2(pipefd[1], STDERR_FILENO);
             close(pipefd[1]);
@@ -180,7 +182,8 @@ void *handle_client(void *arg)
 
         while ((nbytes = read(pipefd[0], output_buffer, sizeof(output_buffer))) > 0)
         {
-            if (send(client_socket, output_buffer, nbytes, 0) < 0) break;
+            if (send(client_socket, output_buffer, nbytes, 0) < 0)
+                break;
         }
 
         close(pipefd[0]);
@@ -226,13 +229,14 @@ void load_blacklist(const char *filename)
 
     blacklist_count = 0;
     char line[MAX_COMMAND_LENGTH];
-    
+
     while (fgets(line, sizeof(line), file) != NULL && blacklist_count < MAX_BLACKLIST_ENTRIES)
     {
         line[strcspn(line, "\n")] = 0;
-        
-        if (line[0] == '#' || line[0] == '\0') continue;
-        
+
+        if (line[0] == '#' || line[0] == '\0')
+            continue;
+
         strcpy(blacklist[blacklist_count], line);
         blacklist_count++;
     }

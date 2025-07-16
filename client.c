@@ -6,14 +6,29 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-const int PORT = 8080;
 const int INITIAL_BUFFER_SIZE = 8192;    // Start with 8KB
 const int MAX_BUFFER_SIZE = 1024 * 1024; // Max 1MB
 
 void exitter(const char *err);
 
-int main()
+int main(int argc, char *argv[])
 {
+    // Check if IP address and port are provided
+    if (argc != 3) {
+        printf("Usage: %s <server_ip> <port>\n", argv[0]);
+        printf("Example: %s 127.0.0.1 8080\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
+    char *server_ip = argv[1];
+    int port = atoi(argv[2]);
+    
+    // Validate port number
+    if (port <= 0 || port > 65535) {
+        fprintf(stderr, "Error: Invalid port number. Port must be between 1 and 65535.\n");
+        exit(EXIT_FAILURE);
+    }
+
     int sock = 0;
     struct sockaddr_in serv_addr;
 
@@ -24,19 +39,22 @@ int main()
     }
 
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(PORT);
+    serv_addr.sin_port = htons(port);
 
-    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0)
+    if (inet_pton(AF_INET, server_ip, &serv_addr.sin_addr) <= 0)
     {
-        exitter("Invalid address / Address not supported");
+        fprintf(stderr, "Error: Invalid IP address '%s'\n", server_ip);
+        exit(EXIT_FAILURE);
     }
 
     if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
     {
-        exitter("Connection Failed");
+        fprintf(stderr, "Error: Connection to %s:%d failed\n", server_ip, port);
+        close(sock);
+        exit(EXIT_FAILURE);
     }
 
-    printf("Connected to server successfully.\n");
+    printf("Connected to server %s:%d successfully.\n", server_ip, port);
 
     char command[1024];
     printf("Enter command to execute remotely: ");
